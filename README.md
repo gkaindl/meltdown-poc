@@ -10,3 +10,6 @@ into `strings`. In this case, it uses Intel's TSX to prevent crashing when
 attempting to access the mem location, just like the meltdown paper says.
 
 Tested on OS X 10.12.6
+
+Update: OS X has a fix available now, so the PoC only works in its own process
+memory anymore.
