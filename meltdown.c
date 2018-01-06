@@ -15,6 +15,9 @@
 #define TEST_IN_OWN_PROCESS 1
 #define TEST_PHRASE "Hmm, this does really work!"
 
+//#define USE_TSX 1
+
+#ifdef USE_TSX
 // TSX support
 
 #ifndef _RTM_H
@@ -76,6 +79,29 @@ static __rtm_force_inline int _xtest(void)
 }
 
 #endif
+#else
+
+#include <sys/ucontext.h>
+#include <signal.h>
+static void sigaction_segv(int signal, siginfo_t *si, void *arg)
+{
+    ucontext_t *ctx = (ucontext_t *)arg;
+
+    /* We are on linux x86, the returning IP is stored in RIP (64bit) or EIP (32bit).
+       In this example, the length of the offending instruction is 6 bytes.
+       So we skip the offender ! */
+    #ifdef __x86_64__
+        fprintf(stderr, "Caught SIGSEGV, addr %p, RIP 0x%llx\n", si->si_addr, ctx->uc_mcontext->__ss.__rip);
+        ctx->uc_mcontext->__ss.__rip += 6; //skip sigsev to next instruction
+    #else
+        #error fix dat for x86
+        printf("Caught SIGSEGV, addr %p, EIP 0x%x\n", si->si_addr, ctx->uc_mcontext.gregs[REG_EIP]);
+        ctx->uc_mcontext.gregs[REG_EIP] += 6;
+    #endif
+}
+
+
+#endif//USE_TSX
 
 __attribute__((always_inline))
 inline void flush(const char *adrs)
@@ -129,8 +155,9 @@ unsigned char probe_one(size_t ptr, char* buf, int page_size)
       for (i=0; i<256; i++) {
          flush(&buf[i * page_size]);
       }
-   
+#ifdef USE_TSX
       if ((status = _xbegin()) == _XBEGIN_STARTED) {
+#endif
          asm __volatile__ (
            "%=:                              \n"
            "xorq %%rax, %%rax                \n"
@@ -141,11 +168,13 @@ unsigned char probe_one(size_t ptr, char* buf, int page_size)
            : 
            :  [ptr] "r" (ptr), [buf] "r" (buf)
            :  "%rax", "%rbx");
-      
-         _xend();
+               
+#ifdef USE_TSX
+          _xend();   
       } else {
          asm __volatile__ ("mfence\n" :::);
       }
+#endif
 
       for (i=0; i<256; i++) {
          times[i] = probe(&buf[i * page_size]);
@@ -201,6 +230,16 @@ int main(int argc, char** argv)
    int page_size = getpagesize(), raw_output = 0;
    unsigned long start_addr = 0;
    unsigned long t, len = 0;
+
+  #ifndef USE_TSX
+    struct sigaction sa;
+
+    memset(&sa, 0, sizeof(sa));
+    sigemptyset(&sa.sa_mask);
+    sa.sa_sigaction = sigaction_segv;
+    sa.sa_flags = SA_SIGINFO;
+    sigaction(SIGSEGV, &sa, NULL);
+  #endif 
 
 #if TEST_IN_OWN_PROCESS
    static char* test = TEST_PHRASE;
