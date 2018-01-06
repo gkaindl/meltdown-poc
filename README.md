@@ -4,8 +4,8 @@ I just wanted to see if this really works, and it actually does. Scary!
 
 It reads out the `TEST_PHRASE` using the timing attack (in its own process).
 
-**Note:** This will only work on Intel "Haswell" and later, since it uses
-the TSX extensions to mitigate the processor trap.
+**Note:** To use TSX instead of signal handling, use -DUSE_TSX or uncomment 
+define macro USE_TSX in the code
 
 Alternatively, by changing the macro `TEST_IN_OWN_PROCESS` to 0, you can
 specify an address and length on the command line, and output raw data to pipe
