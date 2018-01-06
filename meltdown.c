@@ -104,7 +104,7 @@ static void sigaction_segv(int signal, siginfo_t *si, void *arg)
        In this example, the length of the offending instruction is 6 bytes.
        So we skip the offender ! */
     #ifdef __x86_64__
-        fprintf(stderr, "Caught SIGSEGV, addr %p, RIP 0x%llx\n", si->si_addr, RIP);
+        //fprintf(stderr, "Caught SIGSEGV, addr %p, RIP 0x%llx\n", si->si_addr, RIP);
         RIP += 6; //skip sigsev to next instruction
     #else
         #error fix dat for x86
