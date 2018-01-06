@@ -11,6 +11,8 @@
 
 #include <sys/mman.h>
 
+#define __USE_GNU
+
 #define NUM_PROBES 5
 #define TEST_IN_OWN_PROCESS 1
 #define TEST_PHRASE "Hmm, this does really work!"
@@ -81,8 +83,19 @@ static __rtm_force_inline int _xtest(void)
 #endif
 #else
 
-#include <sys/ucontext.h>
+
 #include <signal.h>
+
+#ifdef __APPLE__
+#include <sys/ucontext.h>
+#define RIP ctx->uc_mcontext->__ss.__rip
+
+#else
+#include <ucontext.h>
+#define RIP ctx->uc_mcontext.gregs[REG_RIP]
+
+#endif
+
 static void sigaction_segv(int signal, siginfo_t *si, void *arg)
 {
     ucontext_t *ctx = (ucontext_t *)arg;
@@ -91,8 +104,8 @@ static void sigaction_segv(int signal, siginfo_t *si, void *arg)
        In this example, the length of the offending instruction is 6 bytes.
        So we skip the offender ! */
     #ifdef __x86_64__
-        fprintf(stderr, "Caught SIGSEGV, addr %p, RIP 0x%llx\n", si->si_addr, ctx->uc_mcontext->__ss.__rip);
-        ctx->uc_mcontext->__ss.__rip += 6; //skip sigsev to next instruction
+        fprintf(stderr, "Caught SIGSEGV, addr %p, RIP 0x%llx\n", si->si_addr, RIP);
+        RIP += 6; //skip sigsev to next instruction
     #else
         #error fix dat for x86
         printf("Caught SIGSEGV, addr %p, EIP 0x%x\n", si->si_addr, ctx->uc_mcontext.gregs[REG_EIP]);
