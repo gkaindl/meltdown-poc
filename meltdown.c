@@ -88,14 +88,16 @@ static __rtm_force_inline int _xtest(void)
 #ifdef __APPLE__
 #include <sys/ucontext.h>
 #define RIP ctx->uc_mcontext->__ss.__rip
+#define SPECULATIVE_EXIT _speculative_byte_load_exit
 
 #else
 #include <ucontext.h>
 #define RIP ctx->uc_mcontext.gregs[REG_RIP]
+#define SPECULATIVE_EXIT __speculative_byte_load_exit
 
 #endif
 
-extern char __speculative_byte_load_exit[];
+extern char SPECULATIVE_EXIT[];
 
 static void sigaction_segv(int signal, siginfo_t *si, void *arg)
 {
@@ -106,7 +108,7 @@ static void sigaction_segv(int signal, siginfo_t *si, void *arg)
        So we skip the offender ! */
     #ifdef __x86_64__
         //fprintf(stderr, "Caught SIGSEGV, addr %p, RIP 0x%llx\n", si->si_addr, RIP);
-        RIP = (uintptr_t)__speculative_byte_load_exit; //skip sigsegv to next instruction
+        RIP = (uintptr_t)SPECULATIVE_EXIT; //skip sigsegv to next instruction
     #else
         #error fix dat for x86
         printf("Caught SIGSEGV, addr %p, EIP 0x%x\n", si->si_addr, ctx->uc_mcontext.gregs[REG_EIP]);
